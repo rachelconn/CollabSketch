@@ -1,0 +1,23 @@
+{
+  "name": "sketching",
+  "version": "1.0.0",
+  "description": "Test multi-user sketching app using web sockets",
+  "main": "index.js",
+  "scripts": {
+    "dev": "webpack --mode development --watch ./index.ts",
+    "build": "webpack --mode production ./index.ts"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "source-map-loader": "^2.0.1",
+    "ts-loader": "^8.0.17",
+    "tslint": "^6.1.3",
+    "typescript": "^4.2.3",
+    "webpack": "^5.24.4",
+    "webpack-cli": "^4.5.0"
+  },
+  "dependencies": {
+    "paper": "^0.12.11"
+  }
+}
