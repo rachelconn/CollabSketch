@@ -27,6 +27,10 @@ function getServerID(item: paper.Item): string {
   return serverID;
 }
 
+/**
+ * Uploads an item to the server to synchronize with other clients
+ * @param item Item to send to the server
+ */
 export function sendItemToServer(item: paper.Item): void {
   const serverID = getServerID(item);
 
@@ -43,6 +47,10 @@ export function sendItemToServer(item: paper.Item): void {
   send(message);
 }
 
+/**
+ * Removes an item locally by ID.
+ * @param itemID ID of item to remove
+ */
 export function removeItemByID(itemID: string): void {
   const item = items.get(itemID);
   if (item) {
@@ -52,6 +60,10 @@ export function removeItemByID(itemID: string): void {
   }
 };
 
+/**
+ * Removes an item locally, as well as from the server (if it is being synchronized)
+ * @param item Item to remove
+ */
 export function removeItem(item: paper.Item): void {
   console.log('removing item');
   // Remove locally
@@ -75,12 +87,15 @@ export function removeItem(item: paper.Item): void {
 }
 
 /**
- * Synchronizes a SerializedItem with the server
+ * Creates or updates an item based on one received from the server.
  * @param item SerializedItem to synchronize
  */
 export function createItemFor(item: SerializedItem): void {
+  // Delete local item if needed so it can be updated to the one on the server
+  items.get(item.id)?.remove();
+
+  // Deserialize and save this item locally
   const deserialized = deserializeItem(item);
-  // Create server ID for deserialized item
   itemIDs.set(deserialized, item.id);
   items.set(item.id, deserialized);
 }
