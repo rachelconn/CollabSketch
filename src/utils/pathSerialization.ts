@@ -1,9 +1,20 @@
 import paper from 'paper';
+import { ItemType, SerializedItem } from '../types/serialization';
 
-export function deserializePath(path: string): paper.Path {
-  // Don't render the new point immediately - this will be handled by SynchronizedPath
-  const deserialized = new paper.Path({ insert: false });
-  deserialized.importJSON(path);
+export function deserializeItem(item: SerializedItem): paper.Item {
+  const { type, data } = item;
+
+  // Create correct item type and deserialize
+  let deserialized: paper.Item;
+  switch (type) {
+    case ItemType.PATH:
+      deserialized = new paper.Path();
+      break;
+    default:
+      window.alert(`Unsupported item type: ${type}`);
+      throw Error();
+  }
+  deserialized.importJSON(data);
 
   return deserialized;
 }

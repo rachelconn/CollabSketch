@@ -1,22 +1,22 @@
-import { DeserializedPath } from "./serialization";
+import { SerializedItem } from "./serialization";
 
 // Interfaces for responses received from the server.
-export interface ListPathsResponse {
-  type: 'listPaths',
-  paths: DeserializedPath[],
+export interface ListItemsResponse {
+  type: 'listItems',
+  items: SerializedItem[],
 }
 
-export interface EditPathResponse {
-  type: 'pathEdited',
-  path: string,
+export interface EditItemResponse {
+  type: 'itemEdited',
+  item: SerializedItem,
 }
 
-export interface DeletePathResponse {
-  type: 'pathDeleted',
-  pathID: string,
+export interface DeleteItemResponse {
+  type: 'itemDeleted',
+  itemID: string,
 }
 
-export type PathResponse = ListPathsResponse | EditPathResponse | DeletePathResponse;
+export type PathResponse = ListItemsResponse | EditItemResponse | DeleteItemResponse;
 
 export interface UserResponse {
   type: 'users',
