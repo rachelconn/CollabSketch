@@ -5,10 +5,6 @@ import SocketResponse from '../types/responses';
 // Global WebSocket
 const socket = new WebSocket('ws://localhost:12345');
 
-socket.onopen = (e: Event) => {
-  console.log('hooray');
-};
-
 // Handle message receiving
 function handleMessage(e: MessageEvent) {
   const message: SocketResponse = JSON.parse(e.data);
@@ -28,7 +24,14 @@ function handleMessage(e: MessageEvent) {
   }
 }
 
+// Error handling
+function handleError(e: Event) {
+  window.alert(`WebSocket server error, make sure the server is running.`);
+}
+
 socket.onmessage = handleMessage;
+
+socket.onerror = handleError;
 
 /**
  * Sends a message over the WebSocket.
