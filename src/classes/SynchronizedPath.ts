@@ -1,7 +1,7 @@
 import paper from 'paper';
 import { DeletePathAction, UpdatePathAction } from '../types/actions';
 import { DeserializedPath } from '../types/serialization';
-import { deserializePath, serializePath } from '../utils/pathSerialization';
+import { deserializePath } from '../utils/pathSerialization';
 import send from '../utils/socket';
 
 /**
@@ -48,7 +48,7 @@ export default class SynchronizedPath extends paper.Path {
     const message: UpdatePathAction = {
       action: 'updatePath',
       pathID: this.serverID,
-      pathData: serializePath(this),
+      pathData: this.exportJSON(),
     };
     send(message);
   }

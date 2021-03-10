@@ -1,4 +1,3 @@
-import paper from 'paper';
 import SynchronizedPath from '../classes/SynchronizedPath';
 import SocketAction from '../types/actions';
 import SocketResponse from '../types/responses';

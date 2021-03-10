@@ -1,4 +1,4 @@
-import { DeserializedPath, SerializedPath } from "./serialization";
+import { DeserializedPath } from "./serialization";
 
 // Interfaces for responses received from the server.
 export interface ListPathsResponse {
