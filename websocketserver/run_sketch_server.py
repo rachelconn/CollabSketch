@@ -14,10 +14,10 @@ USERS: Set[websockets.WebSocketClientProtocol] = set()
 SERIALIZATION
 """
 def serialize_paths() -> str:
-    """ Serialize paths to send to clients """
+    """ Serializes all paths to send to clients on initial connection """
     paths = {
-        'type': 'paths',
-        'paths': PATHS,
+        'type': 'listPaths',
+        'paths': [{'id': path_id, 'path': path} for path_id, path in PATHS.items()]
     }
     return json.dumps(paths)
 
@@ -34,16 +34,37 @@ def serialize_users() -> str:
 """
 CLIENT NOTIFICATION: to synchronize updated state across clients
 """
-async def notify_paths() -> None:
-    """ Notifies each connected client of the current paths """
-    if USERS:
-        message = serialize_paths()
-        await asyncio.wait([user.send(message) for user in USERS])
 
-async def notify_paths() -> None:
+async def notify_edit_path(path_id, originator=None) -> None:
+    """ Notifies each connected client that a path has been created or edited.
+    Parameters:
+        originator (optional): A client to not alert (as they originated the event)
+    """
+    message = json.dumps({
+        'type': 'pathEdited',
+        'path': PATHS[path_id],
+    })
+    events = [user.send(message) for user in USERS if user != originator]
+    if events:
+        await asyncio.wait(events)
+
+async def notify_delete_path(path_id, originator=None) -> None:
+    """ Notifies each connected client that a path has been deleted.
+    Parameters:
+        originator (optional): A client to not alert (as they originated the event)
+    """
+    message = json.dumps({
+        'type': 'pathDeleted',
+        'pathID': path_id,
+    })
+    events = [user.send(message) for user in USERS if user != originator]
+    if events:
+        await asyncio.wait(events)
+
+async def notify_users() -> None:
     """ Notifies each connected client of the current users """
     if USERS:
-        message = serialize_paths()
+        message = serialize_users()
         await asyncio.wait([user.send(message) for user in USERS])
 
 """
@@ -59,28 +80,29 @@ async def unregister(websocket) -> None:
 """
 ACTION HANDLERS: to run whenever a client sends an action
 """
-async def add_path(data: Dict) -> None:
+async def add_path(data: Dict, user) -> None:
     """ Action handler for when a new path is created """
     path_id = data.get('pathID')
     path = data.get('pathData')
     if path_id is not None and path is not None:
         PATHS[path_id] = path
-    await notify_paths()
+    await notify_edit_path(path, user)
 
-async def update_path(data: Dict) -> None:
+async def update_path(data: Dict, user) -> None:
     """ Action handler to update an existing path """
+    print('updating path')
     path_id = data.get('pathID')
     path = data.get('pathData')
     if path_id is not None and path is not None:
         PATHS[path_id] = path
-    await notify_paths()
+    await notify_edit_path(path_id, user)
 
-async def delete_path(data: Dict) -> None:
+async def delete_path(data: Dict, user) -> None:
     """ Action handler to delete a path """
     path_id = data.get('pathID')
     if path_id is not None:
         PATHS.pop(path_id, None)
-    await notify_paths()
+        await notify_delete_path(path_id, user)
 
 # Dict mapping action id -> function to run for that action
 actions: Dict[str, Callable[[Dict], Any]] = {
@@ -98,14 +120,15 @@ async def sketch_server_loop(websocket, path) -> None:
     """ Main logic loop for sketch server """
     await register(websocket)
     try:
+        print('User connected')
         await websocket.send(serialize_paths())
         async for message in websocket:
             data = json.loads(message)
             action = data.get('action')
+            print(action)
             handle_action = actions.get(action)
             if handle_action:
-                handle_action(data)
-                await notify_state()
+                await handle_action(data, websocket)
             else:
                 logging.error(f'Invalid action {action}')
     finally:

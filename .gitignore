@@ -5,6 +5,7 @@
 # Build/packages
 node_modules/
 static/
+main.js*
 
 # Environments
 .env

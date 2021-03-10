@@ -1,4 +1,5 @@
 import paper from 'paper';
+import SynchronizedPath from '../classes/SynchronizedPath';
 import getMedian from '../utils/getMedian';
 
 export default function createBrushTool(): paper.Tool {
@@ -19,11 +20,13 @@ export default function createBrushTool(): paper.Tool {
     //var date = new Date();
     //var timesample = date.getTime();
     //t.push(timesample);
-    console.log(path);
   }
 
   function onMouseUp(event: paper.ToolEvent) {
+    // Send path over WebSocket
+    new SynchronizedPath(path).send();
 
+    // Corner detection algorithm
     var x = [];
     var y = [];
 
@@ -38,7 +41,6 @@ export default function createBrushTool(): paper.Tool {
     var deltaTime = [];
     var subStrokes = [];
 
-    console.log();
     // Get x,y,t values for stroke
     for (let i = 0; i < path.length; i++) {
       const point = path.getPointAt(i);
@@ -77,7 +79,6 @@ export default function createBrushTool(): paper.Tool {
       var newStrawLength = newStraw.length
       straw.push(newStrawLength);
     }
-    //console.log(straw);
     // Find average straw length
     //for (i=0; i < straw.length; i++) {
     //		var totalStraw = totalStraw + straw[i];
@@ -102,7 +103,6 @@ export default function createBrushTool(): paper.Tool {
 
     //var timeThreshold = 0.9;
     // Find point candidates
-    console.log(straw);
     for (let i = w; i < Sx.length - w; i++) {
       if (straw[i] < threshold) {
           var localMin = 10000;
@@ -119,7 +119,6 @@ export default function createBrushTool(): paper.Tool {
           // Split stroke
           //path.segments[i].
           //subStrokes.push()
-          //console.log(subStrokes);
           const corner = new paper.Shape.Circle(new paper.Point(Sx[i], Sy[i]), 8);
           corner.fillColor = new paper.Color('red')
       }
