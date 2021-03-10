@@ -22749,6 +22749,96 @@ return paper;
 
 /***/ }),
 
+/***/ "./classes/SynchronizedPath.ts":
+/*!*************************************!*\
+  !*** ./classes/SynchronizedPath.ts ***!
+  \*************************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const paper_1 = __importDefault(__webpack_require__(/*! paper */ "./node_modules/paper/dist/paper-full.js"));
+const pathSerialization_1 = __webpack_require__(/*! ../utils/pathSerialization */ "./utils/pathSerialization.ts");
+const socket_1 = __importDefault(__webpack_require__(/*! ../utils/socket */ "./utils/socket.ts"));
+/**
+ * Generates an ID for the server to use for a path.
+ * Uses the current time in milliseconds and a random int [0, 999] to make collisions
+ * very unlikely.
+ */
+function generateServerID() {
+    return `${new Date().getTime()}-${Math.round(Math.random() * 1000)}`;
+}
+class SynchronizedPath extends paper_1.default.Path {
+    constructor(path, serverID = generateServerID()) {
+        // Make this a copy of the path provided with some additional bookkeeping
+        console.log('synchronized path constructed:');
+        console.log(path);
+        super(path);
+        Object.assign(this, path.clone());
+        this.serverID = serverID;
+        // Don't show the original path anymore - this is a paper.Path object, so it also renders
+        path.remove();
+        // If this has the same ID as an old path, don't render the old one anymore (since it's been updated)
+        const oldPath = SynchronizedPath.allPaths.get(serverID);
+        if (oldPath)
+            oldPath.remove();
+        // Update allPaths with the newly created path, and render it
+        SynchronizedPath.allPaths.set(serverID, this);
+        if (!path.isInserted())
+            path.clone();
+    }
+    /**
+     * send(): Sends the path to the WebSocket server so that all clients can see it.
+     * This can be used to send the path for the first time, or update its value.
+     */
+    send() {
+        console.log('sending:');
+        console.log(this);
+        const message = {
+            action: 'updatePath',
+            pathID: this.serverID,
+            pathData: pathSerialization_1.serializePath(this),
+        };
+        socket_1.default(message);
+    }
+    /**
+     * delete(): Delete the path from the WebSocket server so that no clients see it anymore.
+     * Not to be confused with paper.Path.remove(), which only removes the path locally.
+     */
+    delete() {
+        // Delete locally
+        this.remove();
+        // Send message for other clients to delete
+        const message = {
+            action: 'deletePath',
+            pathID: this.serverID,
+        };
+        socket_1.default(message);
+    }
+    /**
+     * Creates paths corresponding to ones serialized from the server
+     * @param paths Paths to create/update
+     */
+    static createPathsFor(paths) {
+        paths.forEach(({ id, path }) => {
+            // Create SynchronizedPath for each received path, they will automatically be added to allPaths
+            // and render if not yet registered
+            new SynchronizedPath(pathSerialization_1.deserializePath(path), id);
+        });
+    }
+}
+exports.default = SynchronizedPath;
+// Keep track of all paths so those received from the server aren't duplicated
+SynchronizedPath.allPaths = new Map();
+;
+
+
+/***/ }),
+
 /***/ "./index.ts":
 /*!******************!*\
   !*** ./index.ts ***!
@@ -22787,6 +22877,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const paper_1 = __importDefault(__webpack_require__(/*! paper */ "./node_modules/paper/dist/paper-full.js"));
+const SynchronizedPath_1 = __importDefault(__webpack_require__(/*! ../classes/SynchronizedPath */ "./classes/SynchronizedPath.ts"));
 const getMedian_1 = __importDefault(__webpack_require__(/*! ../utils/getMedian */ "./utils/getMedian.ts"));
 function createBrushTool() {
     let path;
@@ -22803,9 +22894,11 @@ function createBrushTool() {
         //var date = new Date();
         //var timesample = date.getTime();
         //t.push(timesample);
-        console.log(path);
     }
     function onMouseUp(event) {
+        // Send path over WebSocket
+        new SynchronizedPath_1.default(path).send();
+        // Corner detection algorithm
         var x = [];
         var y = [];
         var Sx = [];
@@ -22817,7 +22910,6 @@ function createBrushTool() {
         var w = 3;
         var deltaTime = [];
         var subStrokes = [];
-        console.log();
         // Get x,y,t values for stroke
         for (let i = 0; i < path.length; i++) {
             const point = path.getPointAt(i);
@@ -22852,7 +22944,6 @@ function createBrushTool() {
             var newStrawLength = newStraw.length;
             straw.push(newStrawLength);
         }
-        //console.log(straw);
         // Find average straw length
         //for (i=0; i < straw.length; i++) {
         //		var totalStraw = totalStraw + straw[i];
@@ -22872,7 +22963,6 @@ function createBrushTool() {
         //var avgDeltaTime = totalDeltaTime / deltaTime.length;
         //var timeThreshold = 0.9;
         // Find point candidates
-        console.log(straw);
         for (let i = w; i < Sx.length - w; i++) {
             if (straw[i] < threshold) {
                 var localMin = 10000;
@@ -22887,7 +22977,6 @@ function createBrushTool() {
                 // Split stroke
                 //path.segments[i].
                 //subStrokes.push()
-                //console.log(subStrokes);
                 const corner = new paper_1.default.Shape.Circle(new paper_1.default.Point(Sx[i], Sy[i]), 8);
                 corner.fillColor = new paper_1.default.Color('red');
             }
@@ -22918,6 +23007,101 @@ function getMedian(values) {
     return sorted.length % 2 ? sorted[half] : (sorted[half - 1] + sorted[half]) / 2.0;
 }
 exports.default = getMedian;
+
+
+/***/ }),
+
+/***/ "./utils/pathSerialization.ts":
+/*!************************************!*\
+  !*** ./utils/pathSerialization.ts ***!
+  \************************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.deserializePath = exports.serializePath = void 0;
+const paper_1 = __importDefault(__webpack_require__(/*! paper */ "./node_modules/paper/dist/paper-full.js"));
+function serializePath(path) {
+    var _a, _b;
+    const points = [];
+    for (let i = 0; i < path.length; i++) {
+        const { x, y } = path.getPointAt(i);
+        points.push([x, y]);
+    }
+    console.log(points);
+    const serialized = {
+        points,
+        strokeColor: (_a = path.strokeColor) === null || _a === void 0 ? void 0 : _a.toString(),
+        fillColor: (_b = path.fillColor) === null || _b === void 0 ? void 0 : _b.toString(),
+    };
+    console.log(serialized);
+    return JSON.stringify(serialized);
+}
+exports.serializePath = serializePath;
+function deserializePath(path) {
+    // TODO: implement
+    const { points, strokeColor, fillColor } = JSON.parse(path);
+    // Don't render the new point immediately - this will be handled by SynchronizedPath
+    return new paper_1.default.Path({
+        segments: points,
+        strokeColor: new paper_1.default.Color(strokeColor),
+        fillColor: new paper_1.default.Color(fillColor),
+        insert: false,
+    });
+}
+exports.deserializePath = deserializePath;
+
+
+/***/ }),
+
+/***/ "./utils/socket.ts":
+/*!*************************!*\
+  !*** ./utils/socket.ts ***!
+  \*************************/
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const SynchronizedPath_1 = __importDefault(__webpack_require__(/*! ../classes/SynchronizedPath */ "./classes/SynchronizedPath.ts"));
+const pathSerialization_1 = __webpack_require__(/*! ./pathSerialization */ "./utils/pathSerialization.ts");
+// Global WebSocket
+const socket = new WebSocket('ws://localhost:12345');
+socket.onopen = (e) => {
+    console.log('hooray');
+};
+// Handle message receiving
+function handleMessage(e) {
+    const message = JSON.parse(e.data);
+    console.log(message);
+    switch (message.type) {
+        case 'listPaths':
+            SynchronizedPath_1.default.createPathsFor(message.paths);
+            break;
+        case 'pathEdited':
+            console.log('path edited');
+            new SynchronizedPath_1.default(pathSerialization_1.deserializePath(message.path));
+            break;
+        default:
+            window.alert(`Unimplemented message type ${message.type}!`);
+    }
+}
+socket.onmessage = handleMessage;
+/**
+ * Sends a message over the WebSocket.
+ * @param action The action to send a message for.
+ */
+function send(action) {
+    socket.send(JSON.stringify(action));
+}
+exports.default = send;
 
 
 /***/ }),
